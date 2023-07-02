@@ -1,7 +1,7 @@
 ﻿using NUnit.Framework;
 using System;
 
-namespace DataTypeStoreLib
+namespace ObjectStoreE
 {
     [TestFixture]
     public static class Tests

@@ -1,4 +1,4 @@
-﻿namespace DataTypeStoreLib
+﻿namespace ObjectStoreE
 {
     public class DirectValue
     {

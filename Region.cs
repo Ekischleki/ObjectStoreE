@@ -1,6 +1,6 @@
 ﻿using System.Xml.Linq;
 
-namespace DataTypeStoreLib
+namespace ObjectStoreE
 {
     public class Region
     {

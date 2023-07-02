@@ -2,7 +2,7 @@
 using System.Reflection;
 using System.Runtime.Serialization;
 
-namespace DataTypeStoreLib
+namespace ObjectStoreE
 {
     internal class IntHolder
     {
