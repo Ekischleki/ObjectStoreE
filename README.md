@@ -36,8 +36,8 @@ public class SaveObject0
   {
     Region result = new("SaveObject0"); //Create a new region. The standard is to call it the same name as your class (for this the name is "SaveObject0"
     result.SubRegions.Add(anotherObject.RegionSave); //Save the anotherObject object, by calling its RegionSave property
-    result.directValues.Add(new("saveString", saveString)); //Add a direct value to this region, to save 
-    result.directValues.Add(new("saveInt", saveInt.ToString())); //Because Regions need to get converted to strings, every direct value needs to be in string form.
+    result.DirectValues.Add(new("saveString", saveString)); //Add a direct value to this region, to save 
+    result.DirectValues.Add(new("saveInt", saveInt.ToString())); //Because Regions need to get converted to strings, every direct value needs to be in string form.
     return result;
   }
  }
