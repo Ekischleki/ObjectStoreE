@@ -42,6 +42,8 @@ namespace ObjectStoreE
         /// </summary>
         /// <param name="regionData"></param>
         /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+
         public static Region CreateSingleRegionByString(string regionData)
         {
             List<Region> topLevelRegions = Read.TopLevelRegion(regionData.Split(';'));
@@ -53,7 +55,9 @@ namespace ObjectStoreE
         }
         /// <summary>
         /// This will return a region based on the input string you provide it with. This can be used, to convert a RegionSaveString back to a Region.
-        /// It is assumed, that there will be multible top level regions when using this method, so you must provide
+        /// It is assumed, that there will be multible top level regions when using this method, so you must provide the name of the top level region you're seeking.
+        /// It is not recommended to use this method though, because it is standart, to have one top level region and because the it will have to reread the region data everytime you use this.
+        /// This method will throw an exception, if the requested region wasn't found, or if there were multible found.
         /// </summary>
         /// <param name="regionData"></param>
         /// <param name="regionName"></param>
@@ -61,12 +65,21 @@ namespace ObjectStoreE
         /// <exception cref="Exception"></exception>
         public static Region CreateSingleRegionByString(string regionData, string regionName)
         {
-            List<Region> topLevelRegions = Read.TopLevelRegion(regionData.Split(';'));
-            if (topLevelRegions.Count == 0)
+            List<Region> foundTopLevelRegions = Read.TopLevelRegion(regionData.Split(';')).Where(x => x.regionName == regionName).ToList();
+            if (foundTopLevelRegions.Count == 0)
                 throw new Exception("No valid top level region.");
-            if (topLevelRegions.Count > 1)
+            if (foundTopLevelRegions.Count > 1)
                 throw new Exception("Multible top level regions.");
-            return topLevelRegions[0];
+            return foundTopLevelRegions[0];
+        }
+        /// <summary>
+        /// Gets all top level regions on the provided region Data. This can be used, to convert a RegionSaveString back to a Region.
+        /// </summary>
+        /// <param name="regionData"></param>
+        /// <returns></returns>
+        public static List<Region> GetTopLevelRegions(string regionData)
+        {
+            return Read.TopLevelRegion(regionData.Split(';'));
         }
         internal Region(string regionName, List<string> subRegions, List<DirectValue> directValues)
         {

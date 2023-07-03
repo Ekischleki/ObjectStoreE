@@ -24,7 +24,7 @@ namespace ObjectStoreE
     public class Automatic
     {
 
-        public static object ConvertRegion(Region input)
+        public static object ConvertRegionToObject(Region input)
         {
             return ConvertPointer(input, 0, new());
         }
@@ -196,7 +196,7 @@ namespace ObjectStoreE
             return thisObject;
         }
 
-        public static Region Object(object obj, string regionName)
+        public static Region ConvertObjectToRegion(object obj, string regionName)
         {
             Region result = new(regionName);
             result.SubRegions.AddRange(ConvertObject(obj, new(0)));
