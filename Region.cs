@@ -7,15 +7,12 @@ namespace ObjectStoreE
         public string regionName;
         private List<Region>? subRegions;
         private readonly List<string>? subRegionsUnRead;
-        public List<DirectValue> directValues;
-        private string? regionSaveString;
+        public List<DirectValue> DirectValues { get; set; }
         public string RegionSaveString
         {
             get
             {
-                regionSaveString ??= GenerateSaveString();
-                return regionSaveString;
-
+                return GenerateSaveString();
             }
         }
         public List<Region> SubRegions
@@ -39,33 +36,59 @@ namespace ObjectStoreE
                 subRegions = value;
             }
         }
-        public Region(string regionName, List<string> subRegions, List<DirectValue> directValues)
+        /// <summary>
+        /// This will return a region based on the input string you provide it with. This can be used, to convert a RegionSaveString back to a Region.
+        /// This method will throw an exception, if there are multible top level regions, or if there are none.
+        /// </summary>
+        /// <param name="regionData"></param>
+        /// <returns></returns>
+        public static Region CreateSingleRegionByString(string regionData)
+        {
+            List<Region> topLevelRegions = Read.TopLevelRegion(regionData.Split(';'));
+            if (topLevelRegions.Count == 0)
+                throw new Exception("No valid top level region.");
+            if (topLevelRegions.Count > 1)
+                throw new Exception("Multible top level regions.");
+            return topLevelRegions[0];
+        }
+        /// <summary>
+        /// This will return a region based on the input string you provide it with. This can be used, to convert a RegionSaveString back to a Region.
+        /// It is assumed, that there will be multible top level regions when using this method, so you must provide
+        /// </summary>
+        /// <param name="regionData"></param>
+        /// <param name="regionName"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public static Region CreateSingleRegionByString(string regionData, string regionName)
+        {
+            List<Region> topLevelRegions = Read.TopLevelRegion(regionData.Split(';'));
+            if (topLevelRegions.Count == 0)
+                throw new Exception("No valid top level region.");
+            if (topLevelRegions.Count > 1)
+                throw new Exception("Multible top level regions.");
+            return topLevelRegions[0];
+        }
+        internal Region(string regionName, List<string> subRegions, List<DirectValue> directValues)
         {
             this.regionName = regionName;
             this.subRegionsUnRead = new List<string>(subRegions);
-            this.directValues = new List<DirectValue>(directValues);
+            this.DirectValues = new List<DirectValue>(directValues);
         }
         public Region(string regionName)
         {
             this.regionName = regionName;
             this.subRegions = new();
-            this.directValues = new();
+            this.DirectValues = new();
         }
 
-        public Region(string regionName, List<Region> subRegions, List<DirectValue> directValues)
-        {
-            this.regionName = regionName;
-            this.subRegions = new List<Region>(subRegions);
-            this.directValues = new List<DirectValue>(directValues);
-        }
 
         public DirectValue[] FindDirectValueArray(string directValueName)
         {
-            return directValues.Where(x => x.name == directValueName).ToArray();
+            return DirectValues.Where(x => x.name == directValueName).ToArray();
         }
         public DirectValue FindDirectValue(string directValueName)
         {
-            DirectValue[] temp = directValues.Where(x => x.name == directValueName).ToArray();
+            DirectValue[] temp = DirectValues.Where(x => x.name == directValueName).ToArray();
             if (temp.Length != 1)
                 return new("nothingFound", "", false);
             return temp[0];
@@ -106,7 +129,7 @@ namespace ObjectStoreE
             {
                 $"§{regionName}"
             };
-            foreach (DirectValue directValue in directValues)
+            foreach (DirectValue directValue in DirectValues)
             {
                 saveStringList.Add($"-{directValue.name}:{DirectValueClearify.EncodeInvalidChars(directValue.value)}");
             }

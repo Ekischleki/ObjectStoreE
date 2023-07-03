@@ -1,6 +1,6 @@
 ﻿namespace ObjectStoreE
 {
-    public class Read
+    internal class Read
     {
         public static List<Region> TopLevelRegion(string[] file)
         {

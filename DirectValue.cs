@@ -4,7 +4,7 @@
     {
         public string name;
         public string? value;
-        public DirectValue(string name, string? value, bool decodeValue)
+        public DirectValue(string name, string? value, bool decodeValue = false)
         {
             this.name = name;
             if (decodeValue)

@@ -210,7 +210,7 @@ namespace ObjectStoreE
             List<Region> result = new List<Region>() { new(pointerCount.ToString()) }; //Result contains all objects that have been converted by this functions (And recursive calls)
 
             Region currentObject = result[0];
-            currentObject.directValues.Add(new("type", obj.GetType().AssemblyQualifiedName, false));
+            currentObject.DirectValues.Add(new("type", obj.GetType().AssemblyQualifiedName, false));
             if (pointerObjectMap == null)
             {
                 pointerObjectMap = new Dictionary<object, int>();
@@ -231,18 +231,18 @@ namespace ObjectStoreE
 
                     if (itemObject == null)
                     {
-                        item.directValues.Add(new("p", null, false));
+                        item.DirectValues.Add(new("p", null, false));
 
                         continue;
                     }
 
                     if (pointerObjectMap.TryGetValue(itemObject, out int pointerValue)) // Has already parsed
                     {
-                        item.directValues.Add(new("p", pointerValue.ToString(), false));
+                        item.DirectValues.Add(new("p", pointerValue.ToString(), false));
 
                         continue;
                     }
-                    item.directValues.Add(new("p", pointerCount.ToString(), false));
+                    item.DirectValues.Add(new("p", pointerCount.ToString(), false));
 
                     
                     result.AddRange(ConvertObject(itemObject, pointerCount, pointerObjectMap));
@@ -251,7 +251,7 @@ namespace ObjectStoreE
             }
             if (obj is string)
             {
-                currentObject.directValues.Add(new("v", (string)obj, false));
+                currentObject.DirectValues.Add(new("v", (string)obj, false));
                 return result;
             }
 
@@ -264,136 +264,136 @@ namespace ObjectStoreE
             foreach (FieldInfo field in fields)
             {
                 Region currentField = new("field");
-                currentField.directValues.Add(new("n", field.Name, false));
+                currentField.DirectValues.Add(new("n", field.Name, false));
                 
                 currentObject.SubRegions.Add(currentField);
                 if (field.GetValue(obj) == null)
                 {
-                    currentField.directValues.Add(new("v", null, false));
+                    currentField.DirectValues.Add(new("v", null, false));
 
                     continue;
                 }
                 //Numeric
                 if (field.FieldType == typeof(bool))
                 {
-                    currentField.directValues.Add(new("t", "bool", false));
+                    currentField.DirectValues.Add(new("t", "bool", false));
 
-                    currentField.directValues.Add(new("v", ((bool)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((bool)field.GetValue(obj)).ToString(), false));
                     continue;
 
                 }
                 if (field.FieldType == typeof(byte))
                 {
-                    currentField.directValues.Add(new("t", "byte", false));
+                    currentField.DirectValues.Add(new("t", "byte", false));
 
-                    currentField.directValues.Add(new("v", ((byte)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((byte)field.GetValue(obj)).ToString(), false));
                     continue;
 
                 }
                 if (field.FieldType == typeof(sbyte))
                 {
-                    currentField.directValues.Add(new("t", "sbyte", false));
+                    currentField.DirectValues.Add(new("t", "sbyte", false));
 
-                    currentField.directValues.Add(new("v", ((sbyte)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((sbyte)field.GetValue(obj)).ToString(), false));
                     continue;
 
                 }
                 if (field.FieldType == typeof(short))
                 {
-                    currentField.directValues.Add(new("t", "short", false));
+                    currentField.DirectValues.Add(new("t", "short", false));
 
-                    currentField.directValues.Add(new("v", ((short)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((short)field.GetValue(obj)).ToString(), false));
                     continue;
 
                 }
                 if (field.FieldType == typeof(ushort))
                 {
-                    currentField.directValues.Add(new("t", "ushort", false));
+                    currentField.DirectValues.Add(new("t", "ushort", false));
 
-                    currentField.directValues.Add(new("v", ((ushort)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((ushort)field.GetValue(obj)).ToString(), false));
                     continue;
 
                 }
                 if (field.FieldType == typeof(int))
                 {
-                    currentField.directValues.Add(new("t", "int", false));
+                    currentField.DirectValues.Add(new("t", "int", false));
 
-                    currentField.directValues.Add(new("v", ((int)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((int)field.GetValue(obj)).ToString(), false));
                     continue;
 
                 }
                 if (field.FieldType == typeof(uint))
                 {
-                    currentField.directValues.Add(new("t", "uint", false));
+                    currentField.DirectValues.Add(new("t", "uint", false));
 
-                    currentField.directValues.Add(new("v", ((uint)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((uint)field.GetValue(obj)).ToString(), false));
                     continue;
                 }
                 if (field.FieldType == typeof(long))
                 {
-                    currentField.directValues.Add(new("t", "long", false));
+                    currentField.DirectValues.Add(new("t", "long", false));
 
-                    currentField.directValues.Add(new("v", ((long)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((long)field.GetValue(obj)).ToString(), false));
                     continue;
 
                 }
                 if (field.FieldType == typeof(ulong))
                 {
-                    currentField.directValues.Add(new("t", "ulong", false));
+                    currentField.DirectValues.Add(new("t", "ulong", false));
 
-                    currentField.directValues.Add(new("v", ((ulong)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((ulong)field.GetValue(obj)).ToString(), false));
                     continue;
 
                 }
                 if (field.FieldType == typeof(float))
                 {
-                    currentField.directValues.Add(new("t", "float", false));
+                    currentField.DirectValues.Add(new("t", "float", false));
 
-                    currentField.directValues.Add(new("v", ((float)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((float)field.GetValue(obj)).ToString(), false));
                     continue;
 
                 }
                 if (field.FieldType == typeof(double))
                 {
-                    currentField.directValues.Add(new("t", "double", false));
+                    currentField.DirectValues.Add(new("t", "double", false));
 
-                    currentField.directValues.Add(new("v", ((double)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((double)field.GetValue(obj)).ToString(), false));
                     continue;
 
                 }
                 if (field.FieldType == typeof(decimal))
                 {
-                    currentField.directValues.Add(new("t", "decimal", false));
+                    currentField.DirectValues.Add(new("t", "decimal", false));
 
-                    currentField.directValues.Add(new("v", ((decimal)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((decimal)field.GetValue(obj)).ToString(), false));
                     continue;
 
                 }
                 //Char types
                 if (field.FieldType == typeof(char))
                 {
-                    currentField.directValues.Add(new("t", "char", false));
+                    currentField.DirectValues.Add(new("t", "char", false));
 
-                    currentField.directValues.Add(new("v", ((char)field.GetValue(obj)).ToString(), false));
+                    currentField.DirectValues.Add(new("v", ((char)field.GetValue(obj)).ToString(), false));
                     continue;
 
                 }
                 if (field.FieldType == typeof(string))
                 {
-                    currentField.directValues.Add(new("t", "string", false));
+                    currentField.DirectValues.Add(new("t", "string", false));
 
-                    currentField.directValues.Add(new("v", (string)field.GetValue(obj), false));
+                    currentField.DirectValues.Add(new("v", (string)field.GetValue(obj), false));
                     continue;
 
                 }
                 //Custom objects
-                currentField.directValues.Add(new("t", "p", false));
+                currentField.DirectValues.Add(new("t", "p", false));
                 if (pointerObjectMap.TryGetValue(field.GetValue(obj), out int pointerValue)) // Has already parsed
                 {
-                    currentField.directValues.Add(new("v", pointerValue.ToString(), false));
+                    currentField.DirectValues.Add(new("v", pointerValue.ToString(), false));
                     continue;
                 }
-                currentField.directValues.Add(new("v", pointerCount.ToString(), false));
+                currentField.DirectValues.Add(new("v", pointerCount.ToString(), false));
 
                 result.AddRange(ConvertObject(field.GetValue(obj), pointerCount, pointerObjectMap));
 
