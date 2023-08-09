@@ -1,4 +1,5 @@
-﻿using System.Xml.Linq;
+﻿using System.Text;
+using System.Xml.Linq;
 
 namespace ObjectStoreE
 {
@@ -126,15 +127,19 @@ namespace ObjectStoreE
             return foundRegions[0];
         }
 
+        private static StringBuilder sb = new();
         private static string ConvertListToString(List<string> strings)
         {
-            string result = string.Empty;
+            sb.Clear();
             foreach (string s in strings)
                 if (s.Contains(';'))
-                    result += s;
+                    sb.Append(s);
                 else
-                    result += s + ";";
-            return result;
+                {
+                    sb.Append(s);
+                    sb.Append(";");
+                }
+            return sb.ToString();
         }
         private string GenerateSaveString()
         {

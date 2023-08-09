@@ -1,4 +1,6 @@
-﻿namespace ObjectStoreE
+﻿using System.Text;
+
+namespace ObjectStoreE
 
 {
     public class DirectValueClearify
@@ -19,13 +21,15 @@
             }
             return result;
         }
+
+        private static StringBuilder sb = new();
         public static string? DecodeInvalidCharCode(string? text)
         {
             if (text == "?")
                 return null;
             bool inPercent = false;
+            sb.Clear();
             string currentInt = string.Empty;
-            string result = string.Empty;
             foreach (char c in text)
             {
                 if (inPercent) //special chars are inside a percent code like this %0% and the number needs to be extracted.
@@ -33,7 +37,7 @@
                     if (c == '%') //Number extracted; return to normal
                     {
                         inPercent = false;
-                        result += invalidChars[Convert.ToInt32(currentInt)];
+                        sb.Append(invalidChars[Convert.ToInt32(currentInt.ToString())]);
                         currentInt = string.Empty;
                         continue;
 
@@ -47,11 +51,11 @@
                         inPercent = true;
                         continue;
                     }
-                    result += c;
+                    sb.Append(c);
                 }
 
             }
-            return result;
+            return sb.ToString();
         }
     }
 
