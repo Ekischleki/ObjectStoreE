@@ -2,6 +2,18 @@
 {
     internal class Read
     {
+        public static Region GetTopLevelRegionOfString(string input)
+        {
+            List<Region> regions = TopLevelRegion(input.Split(';'));
+            if (regions.Count == 1)
+                return regions[0];
+            if (regions.Count == 0)
+                throw new Exception("Input was empty");
+            throw new Exception("Input had multible regions");
+
+        }
+
+
         public static List<Region> TopLevelRegion(string[] file)
         {
             var result = new List<Region>();
