@@ -1,6 +1,6 @@
 ﻿namespace ObjectStoreE
 {
-    internal class Read
+    public class Read
     {
         public static Region GetTopLevelRegionOfString(string input)
         {
