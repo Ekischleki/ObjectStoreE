@@ -54,6 +54,20 @@ namespace ObjectStoreE
                 throw new Exception("Multible top level regions.");
             return topLevelRegions[0];
         }
+
+        public static Region CreateSingleRegionByPath(string path)
+        {
+            path = path.Replace("\"", "");
+            if (!File.Exists(path))
+                throw new Exception($"{path} does not exist");
+            string regionData = File.ReadAllText(path);
+            List<Region> topLevelRegions = Read.TopLevelRegion(regionData.Split(';'));
+            if (topLevelRegions.Count == 0)
+                throw new Exception("No valid top level region.");
+            if (topLevelRegions.Count > 1)
+                throw new Exception("Multible top level regions.");
+            return topLevelRegions[0];
+        }
         /// <summary>
         /// This will return a region based on the input string you provide it with. This can be used, to convert a RegionSaveString back to a Region.
         /// It is assumed, that there will be multible top level regions when using this method, so you must provide the name of the top level region you're seeking.
