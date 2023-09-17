@@ -8,18 +8,24 @@ namespace ObjectStoreE
         private static readonly char[] invalidChars = { '%', ';', ':', '?' };
         public static string EncodeInvalidChars(string? text)
         {
+            
             if (text == null)
                 return "?";
-            string result = string.Empty;
+            StringBuilder result = new(text.Length);
+            
             foreach (char c in text)
             {
 
                 if (invalidChars.Contains(c))
-                    result += $"%{Array.IndexOf(invalidChars, c)}%";
+                {
+                    result.Append('%');
+                    result.Append(Array.IndexOf(invalidChars, c));
+                    result.Append('%');
+                }
                 else
-                    result += c;
+                    result.Append(c);
             }
-            return result;
+            return result.ToString();
         }
 
         private static StringBuilder sb = new();
