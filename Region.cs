@@ -162,7 +162,7 @@ namespace ObjectStoreE
         }
         private string GenerateSaveString()
         {
-            List<string> saveStringList = new()
+            List<string> saveStringList = new(DirectValues.Count)
             {
                 $"§{regionName}"
             };

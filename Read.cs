@@ -12,7 +12,12 @@
             throw new Exception("Input had multible regions");
 
         }
+        public static List<Region> GetTopLevelRegionsOfString(string input)
+        {
+            return TopLevelRegion(input.Split(';'));
+            
 
+        }
 
         public static List<Region> TopLevelRegion(string[] file)
         {
