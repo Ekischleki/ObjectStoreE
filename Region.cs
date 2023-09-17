@@ -9,6 +9,11 @@ namespace ObjectStoreE
         private List<Region>? subRegions;
         private readonly List<string>? subRegionsUnRead;
         public List<DirectValue> DirectValues { get; set; }
+
+        public override string ToString()
+        {
+            return RegionSaveString;
+        }
         public string RegionSaveString
         {
             get
