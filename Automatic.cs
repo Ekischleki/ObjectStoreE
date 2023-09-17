@@ -24,11 +24,11 @@ namespace ObjectStoreE
     public class Automatic
     {
 
-        public static object ConvertRegionToObject(Region input)
+        public static RequieredType? ConvertRegionToObject<RequieredType>(Region input)
         {
-            return ConvertPointer(input, 0, new());
+            return (RequieredType?)ConvertPointer(input, 0, new(), typeof(RequieredType));
         }
-        private static object ConvertPointer(Region input, int pointer, Dictionary<int, object> pointers)
+        private static object? ConvertPointer(Region input, int pointer, Dictionary<int, object> pointers, Type? requieredInput = null)
         {
 
             Region pointingRegion = input.FindSubregionWithName(pointer.ToString());
@@ -37,9 +37,13 @@ namespace ObjectStoreE
             Type? objType = /*(AppDomain.CurrentDomain.GetAssemblies()
             .SelectMany(a => a.GetTypes())
             .FirstOrDefault(t => t.FullName == typeName)) ?? */Type.GetType(typeName); 
+            
 
             if (objType == null)
                 throw new Exception("Type specefied in file is invalid. It might be due to a version change.");
+            if (requieredInput != null && !requieredInput.IsAssignableFrom(objType))
+                return null;
+
             List<FieldInfo> fields = objType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).ToList();
             fields.AddRange(objType.BaseType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).ToList());
             object thisObject;
