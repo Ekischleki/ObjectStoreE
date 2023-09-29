@@ -23,7 +23,17 @@ namespace ObjectStoreE
     }
     public class Automatic
     {
+        private static readonly (string, Type)[] typeShortcuts = new (string, Type)[]
+        {
+            ("s",  typeof(string)),
+            ("i", typeof(int)),
+            ("l", typeof(long)),
+            ("f", typeof(float)),
+            ("d", typeof(double)),
+            ("b", typeof(bool)),
 
+            
+        };
         public static RequieredType? ConvertRegionToObject<RequieredType>(Region input)
         {
             return (RequieredType?)ConvertPointer(input, 0, new(), typeof(RequieredType));
@@ -34,9 +44,11 @@ namespace ObjectStoreE
             Region pointingRegion = input.FindSubregionWithName(pointer.ToString());
 
             string typeName = pointingRegion.FindDirectValue("type").value;
-            Type? objType = /*(AppDomain.CurrentDomain.GetAssemblies()
-            .SelectMany(a => a.GetTypes())
-            .FirstOrDefault(t => t.FullName == typeName)) ?? */Type.GetType(typeName); 
+
+
+
+
+            Type? objType = typeShortcuts.FirstOrDefault(x => x.Item1 == typeName).Item2 ?? Type.GetType(typeName); 
             
 
             if (objType == null)
@@ -214,7 +226,11 @@ namespace ObjectStoreE
             List<Region> result = new List<Region>() { new(pointerCount.ToString()) }; //Result contains all objects that have been converted by this functions (And recursive calls)
 
             Region currentObject = result[0];
-            currentObject.DirectValues.Add(new("type", obj.GetType().AssemblyQualifiedName, false));
+            Type objectType = obj.GetType();
+            var typeName = typeShortcuts.FirstOrDefault(x => x.Item2 == objectType).Item1;
+            string assemblyTypeName = typeName ?? obj.GetType().AssemblyQualifiedName;
+            
+            currentObject.DirectValues.Add(new("type", assemblyTypeName, false));
             if (pointerObjectMap == null)
             {
                 pointerObjectMap = new Dictionary<object, int>();

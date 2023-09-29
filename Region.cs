@@ -119,13 +119,22 @@ namespace ObjectStoreE
         {
             return DirectValues.Where(x => x.name == directValueName).ToArray();
         }
-        public DirectValue FindDirectValue(string directValueName)
+
+        public DirectValue EnforceFindDirectValue(string directValueName)
         {
-            DirectValue[] temp = DirectValues.Where(x => x.name == directValueName).ToArray();
-            if (temp.Length != 1)
-                return new("nothingFound", "", false);
-            return temp[0];
+            var found = FindDirectValue(directValueName);
+            return found ?? throw new Exception($"Couldn't find direct value name (\"{directValueName}\")");
         }
+
+        public DirectValue? FindDirectValue(string directValueName)
+        {
+            var found = FindDirectValueArray(directValueName);
+            if (found.Length != 1)
+                return null;
+            else 
+                return found[0];
+        }
+        
         public Region[] FindSubregionWithNameArray(string name)
         {
             return SubRegions.Where(x => x.regionName == name).ToArray();
