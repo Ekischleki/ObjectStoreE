@@ -43,7 +43,7 @@ namespace ObjectStoreE
 
             Region pointingRegion = input.FindSubregionWithName(pointer.ToString());
 
-            string typeName = pointingRegion.FindDirectValue("type").value;
+            string typeName = pointingRegion.FindDirectValue("t").value;
 
 
 
@@ -66,7 +66,7 @@ namespace ObjectStoreE
                 Type listType = typeof(List<>).MakeGenericType(elementType);
                 object list = Activator.CreateInstance(listType);
 
-                Region arrayRegion = pointingRegion.FindSubregionWithName("array");
+                Region arrayRegion = pointingRegion.FindSubregionWithName("a");
                 int counter = 0;
 
                 while (true)
@@ -230,7 +230,7 @@ namespace ObjectStoreE
             var typeName = typeShortcuts.FirstOrDefault(x => x.Item2 == objectType).Item1;
             string assemblyTypeName = typeName ?? obj.GetType().AssemblyQualifiedName;
             
-            currentObject.DirectValues.Add(new("type", assemblyTypeName, false));
+            currentObject.DirectValues.Add(new("t", assemblyTypeName, false));
             if (pointerObjectMap == null)
             {
                 pointerObjectMap = new Dictionary<object, int>();
@@ -240,7 +240,7 @@ namespace ObjectStoreE
 
             if (obj.GetType().IsArray)
             {
-                Region enumerable = new("array");
+                Region enumerable = new("a");
                 currentObject.SubRegions.Add(enumerable);
                 int count = -1;
                 foreach (object itemObject in (IEnumerable)obj)
@@ -283,7 +283,7 @@ namespace ObjectStoreE
 
             foreach (FieldInfo field in fields)
             {
-                Region currentField = new("field");
+                Region currentField = new("f");
                 currentField.DirectValues.Add(new("n", field.Name, false));
                 
                 currentObject.SubRegions.Add(currentField);
