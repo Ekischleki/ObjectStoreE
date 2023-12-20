@@ -1,6 +1,8 @@
-﻿namespace ObjectStoreE
+﻿using System.Reflection.Metadata.Ecma335;
+using System.Security;
+namespace ObjectStoreE
 {
-    public class DirectValue
+    public class DirectValue : IDisposable
     {
         public string name;
         public string? value;
@@ -11,6 +13,16 @@
                 this.value = DirectValueClearify.DecodeInvalidCharCode(value);
             else
                 this.value = value;
+        }
+        ~DirectValue() 
+        {
+            Dispose();
+        }
+        public void Dispose()
+        {
+            name = null!;
+            value = null!;
+            GC.SuppressFinalize(this);
         }
     }
 

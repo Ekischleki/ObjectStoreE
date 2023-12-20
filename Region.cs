@@ -3,12 +3,45 @@ using System.Xml.Linq;
 
 namespace ObjectStoreE
 {
-    public class Region
+    public class Region : IDisposable
     {
         public string regionName;
         private List<Region>? subRegions;
-        private readonly List<string>? subRegionsUnRead;
+        private List<string>? subRegionsUnRead;
         public List<DirectValue> DirectValues { get; set; }
+
+        private bool disposed = false;
+        public void Dispose()
+        {
+            GC.SuppressFinalize(this);
+
+            if (disposed) 
+                return; //This shouldn't ever happen
+            regionName = null!;
+
+            subRegionsUnRead = null!;
+
+            foreach(IDisposable subRegion in SubRegions)
+            {
+                subRegion.Dispose();
+            }
+
+            subRegions = null!;
+
+            foreach(IDisposable directValue in DirectValues)
+            {
+                directValue.Dispose();
+            }
+
+            DirectValues = null!;
+
+            disposed = true;
+        }
+
+        ~Region()
+        {
+            Dispose();
+        }
 
         public override string ToString()
         {
@@ -186,6 +219,8 @@ namespace ObjectStoreE
             saveStringList.Add("$");
             return ConvertListToString(saveStringList);
         }
+
+
     }
 
 }
