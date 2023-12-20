@@ -21,7 +21,7 @@ namespace ObjectStoreE
             return a;
         }
     }
-    public class Automatic
+    public static class Automatic
     {
         private static readonly (string, Type)[] typeShortcuts = new (string, Type)[]
         {
@@ -31,7 +31,7 @@ namespace ObjectStoreE
             ("f", typeof(float)),
             ("d", typeof(double)),
             ("b", typeof(bool)),
-
+            ("raw", typeof(byte[])),
             
         };
         public static RequieredType? ConvertRegionToObject<RequieredType>(Region input)
@@ -41,9 +41,9 @@ namespace ObjectStoreE
         private static object? ConvertPointer(Region input, int pointer, Dictionary<int, object> pointers, Type? requieredInput = null)
         {
 
-            Region pointingRegion = input.FindSubregionWithName(pointer.ToString());
+            Region pointingRegion = input.FindSubregionWithName(pointer.ToString())!;
 
-            string typeName = pointingRegion.FindDirectValue("t").value;
+            string typeName = pointingRegion.FindDirectValue("t")!.value ?? throw new InvalidDataException();
 
 
 
@@ -111,7 +111,7 @@ namespace ObjectStoreE
             pointers.Add(pointer, thisObject);
             Type genericListType = typeof(List<>).MakeGenericType(objType);
 
-            foreach (Region fieldRegion in pointingRegion.FindSubregionWithNameArray("field"))
+            foreach (Region fieldRegion in pointingRegion.FindSubregionWithNameArray("f"))
             {
                 string name = fieldRegion.FindDirectValue("n").value ?? throw new Exception("Cannot be null");
                 string? value = fieldRegion.FindDirectValue("v").value;
