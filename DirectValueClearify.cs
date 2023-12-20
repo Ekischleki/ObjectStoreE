@@ -1,9 +1,11 @@
-﻿using System.Text;
+﻿using System.Runtime.InteropServices;
+using System.Security;
+using System.Text;
 
 namespace ObjectStoreE
 
 {
-    public class DirectValueClearify
+    public static class DirectValueClearify
     {
         private static readonly char[] invalidChars = { '%', ';', ':', '?' };
         public static string EncodeInvalidChars(string? text)
