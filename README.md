@@ -1,4 +1,9 @@
 # ObjectStoreE
+## Warning:
+
+If you AOT-Compile with .net 8, this won't work, as reflection data is not saved by default.
+
+
 ## Regions
 A region is a Type in this project, which can contain SubRegions and Direct values. Subregions are more Regions inside the Region and Direct values are string values inside a Region. These regions are used, because they can be converted into strings and back. You can use the ```new Region("Region name")``` constructor, to create a new Region. Then, you can use ```.SubRegions``` and ```.DirectValues```  to access Subregions and direct Values of the Region. You can also create a region using the ```CreateSingleRegionByString()``` method, which will return a Region, based on a Region save string, which you can generate using ```.RegionSaveString```.
 ## Automatic Object conversion
