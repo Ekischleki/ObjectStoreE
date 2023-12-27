@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Reflection;
 using System.Runtime.Serialization;
+using System.Text;
 
 namespace ObjectStoreE
 {
@@ -31,7 +32,7 @@ namespace ObjectStoreE
             ("f", typeof(float)),
             ("d", typeof(double)),
             ("b", typeof(bool)),
-            ("raw", typeof(byte[])),
+            ("byte", typeof(byte)),
             
         };
         public static RequieredType? ConvertRegionToObject<RequieredType>(Region input)
@@ -107,6 +108,11 @@ namespace ObjectStoreE
 
 
             thisObject = FormatterServices.GetUninitializedObject(objType);
+            if (thisObject is IConvertable convertable) //We can use the implemented conversion. This should save a lot of space.
+            {
+                convertable.LoadByRegion(pointingRegion);
+                return thisObject;
+            }
 
             pointers.Add(pointer, thisObject);
             Type genericListType = typeof(List<>).MakeGenericType(objType);
@@ -118,7 +124,9 @@ namespace ObjectStoreE
                 FieldInfo? field = fields.ToList().FirstOrDefault(x => x.Name == name, null);
                 if (field == null)
                 {
-                    throw new Exception("Invalid field name");
+                    StringBuilder allValidFieldNames = new();
+                    fields.ForEach(x => allValidFieldNames.Append(x.Name + ", "));
+                    throw new Exception($"Invalid field name \"{name}\" for object {objType.Name}.\nAll valid names:\n {allValidFieldNames}");
                 }
                 if (value == null)
                 {
@@ -223,7 +231,25 @@ namespace ObjectStoreE
 
         private static List<Region> ConvertObject(object obj, IntHolder pointerCount, Dictionary<object, int>? pointerObjectMap = null)
         {
+            if (obj is IConvertable convertable)
+            {
+                Region implementedConvert = convertable.ConvertToRegion(pointerCount.ToString());
+                if (implementedConvert.FindDirectValue("t") != null)
+                {
+                    throw new Exception("IConvertables can't contain a direct value called 't' in automatic convers");
+                }
+                if (implementedConvert.regionName != pointerCount.ToString())
+                {
+                    throw new Exception($"The result region name for \"{obj}\", which is a {nameof(IConvertable)}, did not corrospond to the given input name.");
+                }
+
+                implementedConvert.DirectValues.Add(new("t", obj.GetType().AssemblyQualifiedName, false));
+                return new() { implementedConvert };
+            }
+
             List<Region> result = new List<Region>() { new(pointerCount.ToString()) }; //Result contains all objects that have been converted by this functions (And recursive calls)
+
+
 
             Region currentObject = result[0];
             Type objectType = obj.GetType();
