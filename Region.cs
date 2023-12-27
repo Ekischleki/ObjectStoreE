@@ -51,7 +51,9 @@ namespace ObjectStoreE
         {
             get
             {
-                return GenerateSaveString();
+                StringBuilder sb = new();
+                GenerateSaveString(sb);
+                return sb.ToString();
             }
         }
         public List<Region> SubRegions
@@ -202,22 +204,19 @@ namespace ObjectStoreE
                 }
             return sb.ToString();
         }
-        private string GenerateSaveString()
+        private void GenerateSaveString(StringBuilder sb)
         {
-            List<string> saveStringList = new(DirectValues.Count)
-            {
-                $"§{regionName}"
-            };
+            sb.Append('§').Append(regionName).Append(';');
             foreach (DirectValue directValue in DirectValues)
             {
-                saveStringList.Add($"-{directValue.name}:{DirectValueClearify.EncodeInvalidChars(directValue.value)}");
+                sb.Append('-').Append(directValue.name).Append(':').Append(DirectValueClearify.EncodeInvalidChars(directValue.value)).Append(';');
             }
 
             if (SubRegions != null)
                 foreach (Region region in SubRegions)
-                    saveStringList.Add(region.RegionSaveString);
-            saveStringList.Add("$");
-            return ConvertListToString(saveStringList);
+                    sb.Append(region.RegionSaveString);
+            sb.Append('$').Append(';');
+            
         }
 
 
