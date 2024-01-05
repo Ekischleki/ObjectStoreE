@@ -67,6 +67,8 @@
                             canAddToSub = false;
                         }
                         break;
+                    default:
+                        throw new Exception($"Invalid item header '{line[..1]}'");
                 }
                 if (canAddToSub && depth != 0)
                     currentSubRegions.Add(line);
