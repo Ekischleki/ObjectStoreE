@@ -30,6 +30,30 @@ namespace ObjectStoreE
             return result.ToString();
         }
 
+        public static void EncodeInvalidChars(string? text, StringBuilder s)
+        {
+
+            if (text == null)
+            {
+                s.Append('?');
+                return;
+            }
+
+            foreach (char c in text)
+            {
+
+                if (invalidChars.Contains(c))
+                {
+                    s.Append('%');
+                    s.Append(Array.IndexOf(invalidChars, c));
+                    s.Append('%');
+                }
+                else
+                    s.Append(c);
+            }
+            return;
+        }
+
         private static StringBuilder sb = new();
         public static string? DecodeInvalidCharCode(string? text)
         {
