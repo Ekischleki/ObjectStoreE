@@ -1,5 +1,4 @@
 ﻿using System.Text;
-using System.Xml.Linq;
 
 namespace ObjectStoreE
 {
@@ -15,20 +14,20 @@ namespace ObjectStoreE
         {
             GC.SuppressFinalize(this);
 
-            if (disposed) 
+            if (disposed)
                 return; //This shouldn't ever happen
             regionName = null!;
 
             subRegionsUnRead = null!;
 
-            foreach(IDisposable subRegion in SubRegions)
+            foreach (IDisposable subRegion in SubRegions)
             {
                 subRegion.Dispose();
             }
 
             subRegions = null!;
 
-            foreach(IDisposable directValue in DirectValues)
+            foreach (IDisposable directValue in DirectValues)
             {
                 directValue.Dispose();
             }
@@ -166,10 +165,10 @@ namespace ObjectStoreE
             var found = FindDirectValueArray(directValueName);
             if (found.Length != 1)
                 return null;
-            else 
+            else
                 return found[0];
         }
-        
+
         public Region[] FindSubregionWithNameArray(string name)
         {
             return SubRegions.Where(x => x.regionName == name).ToArray();
@@ -182,7 +181,8 @@ namespace ObjectStoreE
                 if (failAtNotFound)
                     throw new Exception("There were no regions with the name  " + directValueName + " found");
                 return null;
-            } else if (foundRegions.Length > 1 && failAtMultibleFound)
+            }
+            else if (foundRegions.Length > 1 && failAtMultibleFound)
             {
                 throw new Exception("There are more than 1 regions with the name " + directValueName);
 
@@ -190,33 +190,22 @@ namespace ObjectStoreE
             return foundRegions[0];
         }
 
-        private static StringBuilder sb = new();
-        private static string ConvertListToString(List<string> strings)
-        {
-            sb.Clear();
-            foreach (string s in strings)
-                if (s.Contains(';'))
-                    sb.Append(s);
-                else
-                {
-                    sb.Append(s);
-                    sb.Append(";");
-                }
-            return sb.ToString();
-        }
         private void GenerateSaveString(StringBuilder sb)
         {
             sb.Append('§').Append(regionName).Append(';');
-            foreach (DirectValue directValue in DirectValues)
+            foreach (var directValue in DirectValues)
             {
-                sb.Append('-').Append(directValue.name).Append(':').Append(DirectValueClearify.EncodeInvalidChars(directValue.value)).Append(';');
-            }
 
-            if (SubRegions != null)
-                foreach (Region region in SubRegions)
-                    sb.Append(region.RegionSaveString);
-            sb.Append('$').Append(';');
-            
+                sb.Append('-').Append(directValue.name).Append(':');
+                DirectValueClearify.EncodeInvalidChars(directValue.value, sb);
+                sb.Append(';');
+            }
+            foreach (var subRegion in SubRegions)
+            {
+                subRegion.GenerateSaveString(sb);
+            }
+            sb.Append("$;");
+
         }
 
 
