@@ -2,82 +2,31 @@
 {
     public static class Read
     {
-        public static Region GetTopLevelRegionOfString(string input)
-        {
-            List<Region> regions = TopLevelRegion(input.Split(';'));
-            if (regions.Count == 1)
-                return regions[0];
-            if (regions.Count == 0)
-                throw new Exception("Input was empty");
-            throw new Exception("Input had multible regions");
 
-        }
-        public static List<Region> GetTopLevelRegionsOfString(string input)
+        public static Region Region(string[] file, ref int currentLine)
         {
-            return TopLevelRegion(input.Split(';'));
-            
-
-        }
-
-        public static List<Region> TopLevelRegion(string[] file)
-        {
-            var result = new List<Region>();
-            var currentSubRegions = new List<string>();
-            var directValues = new List<DirectValue>();
-            List<string> directValueTemp;
-            string topLevelName = string.Empty;
-            int depth = 0;
-            bool canAddToSub;
-            foreach (string line in file)
+            var result = new Region();
+            for (; currentLine < file.Length; currentLine++)
             {
+                string line = file[currentLine];
                 if (line == string.Empty) continue;
-                canAddToSub = true;
-                
-                switch (line[..1])
+                switch (line[0])
                 {
-                    case "§":
-                        if (depth == 0)
-                        {
-                            topLevelName = line.Substring(1);
-                            canAddToSub = false;
-                        }
-                        depth++;
+                    case '§':
+                        result.AddSubRegion(line[1..], Region(file, ref currentLine));
                         break;
 
-                    case "$":
-                        depth--;
-                        if (depth < 0)
-                            throw new InvalidDataException("Invalid file formating. Invalid depth.");
-                        if (depth == 0)
-                        {
-                            canAddToSub = false;
-                            result.Add(new Region(topLevelName, currentSubRegions, directValues));
-                            currentSubRegions.Clear();
-                            directValues.Clear();
-                        }
-                        break;
+                    case '$':
+                        return result;
 
-                    case "-":
-                        if (depth == 1)
-                        {
-                            directValueTemp = line[1..].Split(':').ToList();
-                            if (directValueTemp.Count != 2)
-                                throw new InvalidDataException("Invalid file formating. Invalid direct value formating.");
-                            directValues.Add(new DirectValue(directValueTemp[0], directValueTemp[1], true));
-                            canAddToSub = false;
-                        }
+                    case '-':
+                        var split = line.Split(':', 2, StringSplitOptions.None);
+                        result.AddDirectValue(split[0], DirectValueClearify.DecodeInvalidCharCode(split[1]));
                         break;
                     default:
-                        throw new Exception($"Invalid item header '{line[..1]}'");
+                        throw new Exception($"Invalid item header '{line[0]}'");
                 }
-                if (canAddToSub && depth != 0)
-                    currentSubRegions.Add(line);
-
-
             }
-            if (depth != 0)
-                throw new InvalidDataException("Data ended before properly exiting depth");
-
             return result;
         }
     }

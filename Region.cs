@@ -2,44 +2,65 @@
 
 namespace ObjectStoreE
 {
-    public class Region : IDisposable
+    public class Region
     {
-        public string regionName;
-        private List<Region>? subRegions;
-        private List<string>? subRegionsUnRead;
-        public List<DirectValue> DirectValues { get; set; }
+        /// <summary>
+        /// We need to store values in a dict for better access, but to save space, we don't want to generate a list each time we only save a single value.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
 
-        private bool disposed = false;
-        public void Dispose()
-        {
-            GC.SuppressFinalize(this);
 
-            if (disposed)
-                return; //This shouldn't ever happen
-            regionName = null!;
+        private readonly Dictionary<string, IPossibleCollection<Region>> subregions;
+        private readonly Dictionary<string, IPossibleCollection<string?>> directValues;
 
-            subRegionsUnRead = null!;
-
-            foreach (IDisposable subRegion in SubRegions)
+        public IEnumerable<(string name, string? value)> DirectValues { 
+            get 
             {
-                subRegion.Dispose();
+                foreach (var value in directValues)
+                {
+                    foreach (var item in value.Value.GetCollection)
+                    {
+                        yield return (value.Key, item);
+                    }
+                }
             }
-
-            subRegions = null!;
-
-            foreach (IDisposable directValue in DirectValues)
-            {
-                directValue.Dispose();
-            }
-
-            DirectValues = null!;
-
-            disposed = true;
         }
-
-        ~Region()
+        public IEnumerable<(string name, Region value)> Subregions
         {
-            Dispose();
+            get
+            {
+                foreach (var value in subregions)
+                {
+                    foreach (var item in value.Value.GetCollection)
+                    {
+                        yield return (value.Key, item);
+                    }
+                }
+            }
+        }
+        public void AddSubRegion(string regionName, Region region)
+        {
+
+            if (subregions.TryGetValue(regionName, out var value))
+            {
+                subregions[regionName] = value.Add(region);
+            }
+            else
+            {
+                subregions.Add(regionName, new NonCollection<Region>(region));
+            }
+        }
+        public void AddDirectValue(string directValueName, string? value)
+        {
+
+            if (directValues.TryGetValue(directValueName, out var directValueInstance))
+            {
+                directValueInstance.Add(value);
+            }
+            else
+            {
+                directValues.Add(directValueName, new NonCollection<string?>(value));
+            }
         }
 
         public override string ToString()
@@ -51,31 +72,23 @@ namespace ObjectStoreE
             get
             {
                 StringBuilder sb = new();
-                GenerateSaveString(sb);
+                foreach (var region in subregions)
+                {
+                    region.Value.ForEach(x => x.GenerateSaveString(sb, region.Key));
+                }
+                foreach (var directValue in directValues)
+                {
+                    directValue.Value.ForEach(x =>
+                    {
+                        sb.Append('-').Append(directValue.Key).Append(':');
+                        DirectValueClearify.EncodeInvalidChars(x, sb);
+                        sb.Append(';');
+                    });
+                }
                 return sb.ToString();
             }
         }
-        public List<Region> SubRegions
-        {
-            get
-            {
-                if (subRegions == null)
-                    if (subRegionsUnRead == null)
-                        subRegions = new List<Region>();
-                    else
-                        subRegions = new List<Region>(Read.TopLevelRegion(subRegionsUnRead.ToArray()));
-                return subRegions;
-            }
-            set
-            {
-                if (subRegions == null)
-                    if (subRegionsUnRead == null)
-                        subRegions = null;
-                    else
-                        subRegions = new List<Region>(Read.TopLevelRegion(subRegionsUnRead.ToArray()));
-                subRegions = value;
-            }
-        }
+
         /// <summary>
         /// This will return a region based on the input string you provide it with. This can be used, to convert a RegionSaveString back to a Region.
         /// This method will throw an exception, if there are multible top level regions, or if there are none.
@@ -86,123 +99,63 @@ namespace ObjectStoreE
 
         public static Region CreateSingleRegionByString(string regionData)
         {
-            List<Region> topLevelRegions = Read.TopLevelRegion(regionData.Split(';'));
-            if (topLevelRegions.Count == 0)
-                throw new Exception("No valid top level region.");
-            if (topLevelRegions.Count > 1)
-                throw new Exception("Multible top level regions.");
-            return topLevelRegions[0];
+            var start = 0;
+            return Read.Region(regionData.Split(';'), ref start);
         }
 
         public static Region CreateSingleRegionByPath(string path)
         {
             path = path.Replace("\"", "");
-            if (!File.Exists(path))
-                throw new Exception($"{path} does not exist");
-            string regionData = File.ReadAllText(path);
-            List<Region> topLevelRegions = Read.TopLevelRegion(regionData.Split(';'));
-            if (topLevelRegions.Count == 0)
-                throw new Exception("No valid top level region.");
-            if (topLevelRegions.Count > 1)
-                throw new Exception("Multible top level regions.");
-            return topLevelRegions[0];
-        }
-        /// <summary>
-        /// This will return a region based on the input string you provide it with. This can be used, to convert a RegionSaveString back to a Region.
-        /// It is assumed, that there will be multible top level regions when using this method, so you must provide the name of the top level region you're seeking.
-        /// It is not recommended to use this method though, because it is standart, to have one top level region and because the it will have to reread the region data everytime you use this.
-        /// This method will throw an exception, if the requested region wasn't found, or if there were multible found.
-        /// </summary>
-        /// <param name="regionData"></param>
-        /// <param name="regionName"></param>
-        /// <returns></returns>
-        /// <exception cref="Exception"></exception>
-        public static Region CreateSingleRegionByString(string regionData, string regionName)
-        {
-            List<Region> foundTopLevelRegions = Read.TopLevelRegion(regionData.Split(';')).Where(x => x.regionName == regionName).ToList();
-            if (foundTopLevelRegions.Count == 0)
-                throw new Exception("No valid top level region.");
-            if (foundTopLevelRegions.Count > 1)
-                throw new Exception("Multible top level regions.");
-            return foundTopLevelRegions[0];
-        }
-        /// <summary>
-        /// Gets all top level regions on the provided region Data. This can be used, to convert a RegionSaveString back to a Region.
-        /// </summary>
-        /// <param name="regionData"></param>
-        /// <returns></returns>
-        public static List<Region> GetTopLevelRegions(string regionData)
-        {
-            return Read.TopLevelRegion(regionData.Split(';'));
-        }
-        internal Region(string regionName, List<string> subRegions, List<DirectValue> directValues)
-        {
-            this.regionName = regionName;
-            this.subRegionsUnRead = new List<string>(subRegions);
-            this.DirectValues = new List<DirectValue>(directValues);
-        }
-        public Region(string regionName)
-        {
-            this.regionName = regionName;
-            this.subRegions = new();
-            this.DirectValues = new();
+            return CreateSingleRegionByString(File.ReadAllText(path));
         }
 
-
-        public DirectValue[] FindDirectValueArray(string directValueName)
+        public Region()
         {
-            return DirectValues.Where(x => x.name == directValueName).ToArray();
+            subregions = new();
+            directValues = new();
         }
+        public IEnumerable<Region> FindSubregionsWithName(string name)
+            => subregions.GetValueOrDefault(name, IPossibleCollection<Region>.Empty).GetCollection;
 
-        public DirectValue EnforceFindDirectValue(string directValueName)
-        {
-            var found = FindDirectValue(directValueName);
-            return found ?? throw new Exception($"Couldn't find direct value name (\"{directValueName}\")");
-        }
+        public IEnumerable<string?> FindDirectValuesWithName(string name)
+            => directValues.GetValueOrDefault(name, IPossibleCollection<string?>.Empty).GetCollection;
 
-        public DirectValue? FindDirectValue(string directValueName)
+        public string? FindDirectValue(string directValueName)
+            => directValues[directValueName].GetSingleValue;
+
+
+        public string? FindDirectValueOrDefault(string directValueName, string? defaultAtNotFound = null, string? defaultAtNullValue = null)
         {
-            var found = FindDirectValueArray(directValueName);
-            if (found.Length != 1)
-                return null;
+            var directValue = directValues.GetValueOrDefault(directValueName);
+            if (directValue == null)
+                return defaultAtNotFound;
             else
-                return found[0];
+                return directValue.GetSingleValue ?? defaultAtNullValue;
         }
 
-        public Region[] FindSubregionWithNameArray(string name)
-        {
-            return SubRegions.Where(x => x.regionName == name).ToArray();
-        }
-        public Region? FindSubregionWithName(string directValueName, bool failAtNotFound = true, bool failAtMultibleFound = true)
-        {
-            Region[] foundRegions = SubRegions.Where(x => x.regionName == directValueName).ToArray();
-            if (foundRegions.Length == 0)
-            {
-                if (failAtNotFound)
-                    throw new Exception("There were no regions with the name  " + directValueName + " found");
-                return null;
-            }
-            else if (foundRegions.Length > 1 && failAtMultibleFound)
-            {
-                throw new Exception("There are more than 1 regions with the name " + directValueName);
 
-            }
-            return foundRegions[0];
-        }
 
-        private void GenerateSaveString(StringBuilder sb)
+        public Region? FindSubregionWithNameOrDefault(string directValueName)
+            => subregions.GetValueOrDefault(directValueName)?.GetSingleValue;
+        public Region FindSubregionWithName(string directValueName)
+            => subregions[directValueName].GetSingleValue;
+
+
+        private void GenerateSaveString(StringBuilder sb, string name)
         {
-            sb.Append('§').Append(regionName).Append(';');
-            foreach (var directValue in DirectValues)
+            sb.Append('§').Append(name).Append(';');
+            foreach (var directValue in directValues)
             {
-
-                sb.Append('-').Append(directValue.name).Append(':');
-                DirectValueClearify.EncodeInvalidChars(directValue.value, sb);
-                sb.Append(';');
+                directValue.Value.ForEach(x =>
+                {
+                    sb.Append('-').Append(directValue.Key).Append(':');
+                    DirectValueClearify.EncodeInvalidChars(x, sb);
+                    sb.Append(';');
+                });
             }
-            foreach (var subRegion in SubRegions)
+            foreach (var subRegion in subregions)
             {
-                subRegion.GenerateSaveString(sb);
+                subRegion.Value.ForEach(x => x.GenerateSaveString(sb, subRegion.Key));
             }
             sb.Append("$;");
 

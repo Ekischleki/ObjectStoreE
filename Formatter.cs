@@ -13,19 +13,19 @@ namespace ObjectStoreE
         {
             sb.Append('\t', (int)amount);
         }
-        private static void Format(Region region, StringBuilder sb, uint tabamount, bool escapeValues) 
+        private static void Format(Region region, StringBuilder sb, uint tabamount, bool escapeValues, string regionName) 
         {
             AppendTabamount(sb, tabamount);
-            sb.Append('§').Append(region.regionName).AppendLine(";");
+            sb.Append('§').Append(regionName).AppendLine(";");
             foreach(var directValue in region.DirectValues)
             {
                 AppendTabamount(sb, tabamount + 1);
                 
                 sb.Append('-').Append(directValue.name).Append(':').Append(escapeValues ? DirectValueClearify.EncodeInvalidChars(directValue.value) : (directValue.value ?? "<null>")).AppendLine(";");
             }
-            foreach(var subRegion in region.SubRegions)
+            foreach(var subRegion in region.Subregions)
             {
-                Format(subRegion, sb, tabamount + 1, escapeValues);
+                Format(subRegion.value, sb, tabamount + 1, escapeValues, subRegion.name);
             }
             AppendTabamount(sb, tabamount);
             sb.AppendLine("$;");
@@ -33,7 +33,7 @@ namespace ObjectStoreE
         public static string FormatRegion(Region region, bool escapeValues = true)
         {
             StringBuilder sb = new StringBuilder();
-            Format(region, sb, 0, escapeValues);
+            Format(region, sb, 0, escapeValues, "ROOT_REGION (This is not supposed to be parsed, and is just meant to visualize data)");
             return sb.ToString();
         }
 
