@@ -13,7 +13,7 @@ namespace ObjectStoreE
         /// </summary>
         /// <param name="regionName">The name the region should have</param>
         /// <returns>A region that can be parsed by the <see cref="LoadByRegion(Region)"/> method</returns>
-        public Region ConvertToRegion(string regionName);
+        public Region ConvertToRegion(Automatic.ConversionContext? automaticConversionContext);
 
         /// <summary>
         /// Recreate the object based on the region input. When this is called, the object is uninitialized.

@@ -1,134 +1,212 @@
 ﻿using System.Collections;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Serialization;
-using System.Text;
 
 namespace ObjectStoreE
 {
-    internal class IntHolder
-    {
-        public int value;
-        public IntHolder(int value)
-        {
-            this.value = value;
-        }
-        public override string ToString()
-        {
-            return value.ToString();
-        }
-        public static IntHolder operator +(IntHolder a, int b)
-        {
-            a.value += b;
-            return a;
-        }
-    }
+
+
+
     public static class Automatic
     {
-        private static readonly (string, Type)[] typeShortcuts = new (string, Type)[]
+        public class ConversionContext
         {
-            ("s",  typeof(string)),
-            ("i", typeof(int)),
-            ("l", typeof(long)),
-            ("f", typeof(float)),
-            ("d", typeof(double)),
-            ("b", typeof(bool)),
-            ("byte", typeof(byte)),
-            
-        };
-        public static RequieredType? ConvertRegionToObject<RequieredType>(Region input)
-        {
-            return (RequieredType?)ConvertPointer(input, 0, new(), typeof(RequieredType));
+            private int nextPointer = 0;
+            public string GetNextPointer()
+            {
+                try
+                {
+                    return nextPointer.ToString("X");
+                }
+                finally
+                {
+                    nextPointer++;
+                }
+            }
+            public readonly Dictionary<object, string> PointerMap = new();
+            public readonly Queue<(object obj, string usePointer)> QueuedConversions = new();
+            public readonly Region result;
+            public ConversionContext()
+            {
+                result = new();
+            }
+            /// <summary>
+            /// A pointer to an object (Will enqueue if object has not been parsed)
+            /// </summary>
+            /// <param fieldName="obj"></param>
+            /// <returns></returns>
+            public string GetReferencePointer(object obj)
+            {
+                if (PointerMap.TryGetValue(obj, out string? ptrName))
+                {
+                    return ptrName;
+                }
+                ptrName = GetNextPointer();
+                QueuedConversions.Enqueue((obj, ptrName));
+                PointerMap.Add(obj, ptrName);
+                return ptrName;
+            }
         }
-        private static object? ConvertPointer(Region input, int pointer, Dictionary<int, object> pointers, Type? requieredInput = null)
+
+        private class ParsingContext
         {
 
-            Region pointingRegion = input.FindSubregionWithName(pointer.ToString())!;
+            public ParsingContext(Region data)
+            {
+                this.data = data;
+            }
+            public readonly Region data;
+            public Dictionary<string, object> PointerMap = new();
+            public readonly Queue<(string pointer, object obj)> QueuedParsings = new();
 
-            string typeName = pointingRegion.FindDirectValue("t")!.value ?? throw new InvalidDataException();
+
+
+            public object GetReferenceObj(string pointer, Type objectType)
+            {
+                if (PointerMap.TryGetValue(pointer, out object? reference))
+                {
+                    return reference;
+                }
+                object resultObject;
+                if (objectType.IsArray)
+                {
+
+                    Region pointerData = data.FindSubregionWithName(pointer);
+                    resultObject = Array.CreateInstance(objectType.GetElementType()!, int.Parse(pointerData.FindDirectValue("c") ?? throw new Exception("Value cannot be null")));
+                }
+                else
+                {
+                    resultObject = FormatterServices.GetUninitializedObject(objectType);
+                }
+
+
+                QueuedParsings.Enqueue((pointer, resultObject));
+                PointerMap.Add(pointer, resultObject);
+                return resultObject;
+            }
+        }
+
+        private static readonly Dictionary<string, Type> typeShortcuts = new()
+        {
+            { "s",  typeof(string) },
+            { "i", typeof(int) },
+            { "l", typeof(long) },
+            { "f", typeof(float) },
+            { "d", typeof(double) },
+            { "b", typeof(bool) },
+            { "byte", typeof(byte) },
+
+        };
+
+        private static readonly Dictionary<Type, string> typeNames = ReverceDict(typeShortcuts);
+
+        private static Dictionary<U, T> ReverceDict<T, U>(Dictionary<T, U> dict)
+            where U : notnull
+            where T : notnull
+        {
+            Dictionary<U, T> result = new();
+            foreach (var key in dict)
+            {
+                result.Add(key.Value, key.Key);
+            }
+            return result;
+        }
+        public static ExpectedType? ConvertRegionToObject<ExpectedType>(Region input)
+        {
+
+            ParsingContext parser = new(input);
+
+            string basePtr = input.FindDirectValue("base") ?? throw new Exception("Value cannot be null");
+
+            Region baseRegion = input.FindSubregionWithName(basePtr)!;
+
+            object resultObject = parser.GetReferenceObj(basePtr, typeof(ExpectedType));
 
 
 
+            while (parser.QueuedParsings.Count > 0)
+            {
+                var ptr = parser.QueuedParsings.Dequeue().pointer;
 
-            Type? objType = typeShortcuts.FirstOrDefault(x => x.Item1 == typeName).Item2 ?? Type.GetType(typeName); 
-            
+                if (ptr == basePtr)
+                {
+                    ConvertPointer(ptr, parser, typeof(ExpectedType));
+                }
+                else
+                {
+                    ConvertPointer(ptr, parser, null);
+                }
+            }
 
-            if (objType == null)
-                throw new Exception("Type specefied in file is invalid. It might be due to a version change.");
-            if (requieredInput != null && !requieredInput.IsAssignableFrom(objType))
-                return null;
+            return (ExpectedType?)resultObject;
+        }
+
+
+
+        private static void ConvertPointer(string pointer, ParsingContext parser, Type? expectedType)
+        {
+            Region thisRegion = parser.data.FindSubregionWithName(pointer);
+
+            string typeName = thisRegion.FindDirectValue("t");
+
+            Type? objType = (typeShortcuts.GetValueOrDefault(typeName) ?? Type.GetType(typeName))
+                ?? throw new Exception("Type specefied in file is invalid. It might be due to a version change.");
+            if (expectedType != null && !expectedType.IsAssignableFrom(objType))
+                throw new Exception("The input ptr did not match the expected objectType");
 
             List<FieldInfo> fields = objType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).ToList();
             fields.AddRange(objType.BaseType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).ToList());
-            object thisObject;
+            object thisObject = parser.GetReferenceObj(pointer, objType);
             if (objType.IsArray)
             {
-                //Create List of array type to add Items and later convert into array
-                Type elementType = objType.GetElementType();
+                Type elementType = objType.GetElementType()!;
                 Type listType = typeof(List<>).MakeGenericType(elementType);
-                object list = Activator.CreateInstance(listType);
+                IList list = Activator.CreateInstance(listType)! as IList ?? throw new Exception();
 
-                Region arrayRegion = pointingRegion.FindSubregionWithName("a");
+                Region arrayRegion = thisRegion.FindSubregionWithName("a");
                 int counter = 0;
 
                 while (true)
                 {
-                    Region? currentIndexRegion = arrayRegion.FindSubregionWithName(counter.ToString(), false, true);
+                    Region? currentIndexRegion = arrayRegion.FindSubregionWithNameOrDefault(counter.ToString());
                     if (currentIndexRegion == null) //No more indices
                         break;
-                    string? currentIndexPointer = currentIndexRegion.FindDirectValue("p").value;
+                    string? currentIndexPointer = currentIndexRegion.FindDirectValueOrDefault("p", null);
 
                     if (currentIndexPointer == null) //Index is null
                     {
-                        list.GetType().GetMethod("Add").Invoke(list, new object?[] { null });
+
+                        list.Add(null);
 
                     }
                     else
                     {
-                        int currentIndexPointerLiteral = int.Parse(currentIndexPointer);
-                        if (pointers.TryGetValue(currentIndexPointerLiteral, out object? foundPointer)) //Index has already been parsed
-                        {
-                            list.GetType().GetMethod("Add").Invoke(list, new object[] { foundPointer });
-                        }
-                        else
-                        {
+                        list.Add(parser.GetReferenceObj(currentIndexPointer, elementType));
 
-                            list.GetType().GetMethod("Add").Invoke(list, new object[] { ConvertPointer(input, currentIndexPointerLiteral, pointers) });
-                        }
                     }
                     counter++;
                 }
-                thisObject = list.GetType().GetMethod("ToArray").Invoke(list, null);
-                return thisObject;
-            }
-            if (objType == typeof(string))
-            {
-                thisObject = pointingRegion.FindDirectValue("v").value;
-                return thisObject;
+
+                list.CopyTo((Array)thisObject, 0);
+                return;
             }
 
 
-            thisObject = FormatterServices.GetUninitializedObject(objType);
-            if (thisObject is IConvertable convertable) //We can use the implemented conversion. This should save a lot of space.
+            if (thisObject is IConvertable convertable) //We can use the implemented parser. This should save a lot of space.
             {
-                convertable.LoadByRegion(pointingRegion);
-                return thisObject;
+                convertable.LoadByRegion(thisRegion);
+                return;
             }
+            //Type genericListType = typeof(List<>).MakeGenericType(objType);
 
-            pointers.Add(pointer, thisObject);
-            Type genericListType = typeof(List<>).MakeGenericType(objType);
-
-            foreach (Region fieldRegion in pointingRegion.FindSubregionWithNameArray("f"))
+            foreach (Region fieldRegion in thisRegion.FindSubregionsWithName("f"))
             {
-                string name = fieldRegion.FindDirectValue("n").value ?? throw new Exception("Cannot be null");
-                string? value = fieldRegion.FindDirectValue("v").value;
-                FieldInfo? field = fields.ToList().FirstOrDefault(x => x.Name == name, null);
-                if (field == null)
-                {
-                    StringBuilder allValidFieldNames = new();
-                    fields.ForEach(x => allValidFieldNames.Append(x.Name + ", "));
-                    throw new Exception($"Invalid field name \"{name}\" for object {objType.Name}.\nAll valid names:\n {allValidFieldNames}");
-                }
-                if (value == null)
+                string fieldName = fieldRegion.FindDirectValue("n") ?? throw new Exception("Cannot be null");
+                string? fieldValue = fieldRegion.FindDirectValue("v");
+                FieldInfo? field = fields.FirstOrDefault(x => x.Name == fieldName, null) ?? throw new Exception("Cannot decode field as it doesn't exist anymore.");
+
+                if (fieldValue == null)
                 {
                     field.SetValue(thisObject, null);
                     continue;
@@ -137,314 +215,298 @@ namespace ObjectStoreE
 
                 if (field.FieldType == typeof(bool))
                 {
-                    field.SetValue(thisObject, bool.Parse(value));
+                    field.SetValue(thisObject, bool.Parse(fieldValue));
                     continue;
                 }
                 if (field.FieldType == typeof(byte))
                 {
-                    field.SetValue(thisObject, byte.Parse(value));
+                    field.SetValue(thisObject, byte.Parse(fieldValue));
                     continue;
 
                 }
                 if (field.FieldType == typeof(sbyte))
                 {
-                    field.SetValue(thisObject, sbyte.Parse(value));
+                    field.SetValue(thisObject, sbyte.Parse(fieldValue));
                     continue;
                 }
                 if (field.FieldType == typeof(short))
                 {
-                    field.SetValue(thisObject, short.Parse(value));
+                    field.SetValue(thisObject, short.Parse(fieldValue));
                     continue;
                 }
                 if (field.FieldType == typeof(ushort))
                 {
-                    field.SetValue(thisObject, ushort.Parse(value));
+                    field.SetValue(thisObject, ushort.Parse(fieldValue));
                     continue;
                 }
                 if (field.FieldType == typeof(int))
                 {
-                    field.SetValue(thisObject, int.Parse(value));
+                    field.SetValue(thisObject, int.Parse(fieldValue));
                     continue;
                 }
                 if (field.FieldType == typeof(uint))
                 {
-                    field.SetValue(thisObject, uint.Parse(value));
+                    field.SetValue(thisObject, uint.Parse(fieldValue));
                     continue;
                 }
                 if (field.FieldType == typeof(long))
                 {
-                    field.SetValue(thisObject, long.Parse(value));
+                    field.SetValue(thisObject, long.Parse(fieldValue));
                     continue;
 
                 }
                 if (field.FieldType == typeof(ulong))
                 {
-                    field.SetValue(thisObject, ulong.Parse(value));
+                    field.SetValue(thisObject, ulong.Parse(fieldValue));
                     continue;
                 }
                 if (field.FieldType == typeof(float))
                 {
-                    field.SetValue(thisObject, float.Parse(value));
+                    field.SetValue(thisObject, float.Parse(fieldValue));
                     continue;
                 }
                 if (field.FieldType == typeof(double))
                 {
-                    field.SetValue(thisObject, double.Parse(value));
+                    field.SetValue(thisObject, double.Parse(fieldValue));
                     continue;
                 }
                 if (field.FieldType == typeof(decimal))
                 {
-                    field.SetValue(thisObject, decimal.Parse(value));
+                    field.SetValue(thisObject, decimal.Parse(fieldValue));
                     continue;
                 }
                 //Char types
                 if (field.FieldType == typeof(char))
                 {
-                    field.SetValue(thisObject, char.Parse(value));
+                    field.SetValue(thisObject, char.Parse(fieldValue));
                     continue;
                 }
                 if (field.FieldType == typeof(string))
                 {
-                    field.SetValue(thisObject, value);
+                    field.SetValue(thisObject, fieldValue);
                     continue;
                 }
-                //Custom objects
-                if (pointers.TryGetValue(int.Parse(value), out object pointing))
-                {
-                    field.SetValue(thisObject, pointing);
-                    continue;
-                }
-                field.SetValue(thisObject, ConvertPointer(input, int.Parse(value), pointers));
+                //Mutable objects
+                Region pointingFieldRegion = parser.data.FindSubregionWithNameOrDefault(fieldValue)!;
+                Type fieldRuntimeType = Type.GetType(pointingFieldRegion.FindDirectValue("t") ?? throw new Exception("Cannot be null")) ?? throw new Exception("Invalid runtime objectType, perhaps the binary changed between versions.");
+                
+                field.SetValue(thisObject, parser.GetReferenceObj(fieldValue, fieldRuntimeType));
+                continue;
+
             }
 
-            return thisObject;
+            return;
         }
-
-        public static Region ConvertObjectToRegion(object obj, string regionName)
+        public static Region ConvertObjectToRegion(object obj)
         {
-            Region result = new(regionName);
-            result.SubRegions.AddRange(ConvertObject(obj, new(0)));
-            return result;
+            ConversionContext conversion = new();
+
+            conversion.result.AddDirectValue("base", conversion.GetReferencePointer(obj));
+            while (conversion.QueuedConversions.Count > 0)
+            {
+                
+                var (convertObj, pointer) = conversion.QueuedConversions.Dequeue();
+                //Debug.Assert(conversion.result.Subregions.All(x => x.value.Subregions.Any(x => x.name == "f")));
+                //Debug.Assert(convertObj.GetType() != typeof(string));
+                ConvertObject(convertObj, pointer, conversion);
+            }
+
+            return conversion.result;
         }
 
 
 
-        private static List<Region> ConvertObject(object obj, IntHolder pointerCount, Dictionary<object, int>? pointerObjectMap = null)
+        private static void ConvertObject(object obj, string pointer, ConversionContext conversion)
         {
             if (obj is IConvertable convertable)
             {
-                Region implementedConvert = convertable.ConvertToRegion(pointerCount.ToString());
-                if (implementedConvert.FindDirectValue("t") != null)
+                Region implementedConvert = convertable.ConvertToRegion(conversion);
+                if (implementedConvert.FindDirectValueOrDefault("t", defaultAtNullValue: string.Empty) != null)
                 {
-                    throw new Exception("IConvertables can't contain a direct value called 't' in automatic convers");
-                }
-                if (implementedConvert.regionName != pointerCount.ToString())
-                {
-                    throw new Exception($"The result region name for \"{obj}\", which is a {nameof(IConvertable)}, did not corrospond to the given input name.");
+                    throw new Exception("IConvertables can't contain a direct fieldValue called 't' in automatic conversions");
                 }
 
-                implementedConvert.DirectValues.Add(new("t", obj.GetType().AssemblyQualifiedName, false));
-                return new() { implementedConvert };
+                implementedConvert.AddDirectValue("t", obj.GetType().AssemblyQualifiedName);
+                conversion.result.AddSubRegion(pointer, implementedConvert);
+                return;
             }
 
-            List<Region> result = new List<Region>() { new(pointerCount.ToString()) }; //Result contains all objects that have been converted by this functions (And recursive calls)
+            //List<Region> ptrName = new List<Region>() { new(pointerCount.ToString()) }; //Result contains all objects that have been converted by this functions (And recursive calls)
 
 
 
-            Region currentObject = result[0];
+            Region currentObject = new();
+            conversion.result.AddSubRegion(pointer, currentObject);
+
             Type objectType = obj.GetType();
-            var typeName = typeShortcuts.FirstOrDefault(x => x.Item2 == objectType).Item1;
-            string assemblyTypeName = typeName ?? obj.GetType().AssemblyQualifiedName;
-            
-            currentObject.DirectValues.Add(new("t", assemblyTypeName, false));
-            if (pointerObjectMap == null)
-            {
-                pointerObjectMap = new Dictionary<object, int>();
-            }
-            pointerObjectMap.Add(obj, pointerCount.value);
-            pointerCount += 1;
 
-            if (obj.GetType().IsArray)
+            Debug.Assert(objectType != typeof(string));
+            var typeName = typeNames.GetValueOrDefault(objectType);
+            string assemblyTypeName = typeName ?? obj.GetType().AssemblyQualifiedName ?? throw new Exception("Assembly Qualified name for object objectType is null");
+
+            currentObject.AddDirectValue("t", assemblyTypeName);
+
+            if (objectType.IsArray)
             {
-                Region enumerable = new("a");
-                currentObject.SubRegions.Add(enumerable);
+                currentObject.AddDirectValue("c", ((Array)obj).Length.ToString());
+                Region arrayRegion = new();
+                currentObject.AddSubRegion("a", arrayRegion);
                 int count = -1;
                 foreach (object itemObject in (IEnumerable)obj)
                 {
                     count++;
-                    Region item = new(count.ToString());
-                    enumerable.SubRegions.Add(item);
+                    Region item = new();
+                    arrayRegion.AddSubRegion(count.ToString(), item);
 
-                    if (itemObject == null)
+                    if (itemObject != null)
                     {
-                        item.DirectValues.Add(new("p", null, false));
-
-                        continue;
+                        item.AddDirectValue("p", conversion.GetReferencePointer(itemObject));
                     }
 
-                    if (pointerObjectMap.TryGetValue(itemObject, out int pointerValue)) // Has already parsed
-                    {
-                        item.DirectValues.Add(new("p", pointerValue.ToString(), false));
 
-                        continue;
-                    }
-                    item.DirectValues.Add(new("p", pointerCount.ToString(), false));
-
-                    
-                    result.AddRange(ConvertObject(itemObject, pointerCount, pointerObjectMap));
                 }
-                return result;
-            }
-            if (obj is string)
-            {
-                currentObject.DirectValues.Add(new("v", (string)obj, false));
-                return result;
+                return;
             }
 
 
-
-            Type type = obj.GetType();
-            List<FieldInfo> fields = type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).ToList();
-            fields.AddRange(type.BaseType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).ToList());
+            List<FieldInfo> fields = objectType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).ToList();
+            fields.AddRange(objectType.BaseType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).ToList());
 
             foreach (FieldInfo field in fields)
             {
-                Region currentField = new("f");
-                currentField.DirectValues.Add(new("n", field.Name, false));
-                
-                currentObject.SubRegions.Add(currentField);
-                if (field.GetValue(obj) == null)
+                Region currentField = new();
+                currentField.AddDirectValue("n", field.Name);
+                currentObject.AddSubRegion("f", currentField);
+
+                var fieldValue = field.GetValue(obj);
+                if (fieldValue == null)
                 {
-                    currentField.DirectValues.Add(new("v", null, false));
+                    currentField.AddDirectValue("v", null);
 
                     continue;
                 }
+
+
+
                 //Numeric
                 if (field.FieldType == typeof(bool))
                 {
-                    currentField.DirectValues.Add(new("t", "bool", false));
+                    currentField.AddDirectValue("t", "bool");
 
-                    currentField.DirectValues.Add(new("v", ((bool)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((bool)fieldValue).ToString());
                     continue;
 
                 }
                 if (field.FieldType == typeof(byte))
                 {
-                    currentField.DirectValues.Add(new("t", "byte", false));
+                    currentField.AddDirectValue("t", "byte");
 
-                    currentField.DirectValues.Add(new("v", ((byte)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((byte)fieldValue).ToString());
                     continue;
 
                 }
                 if (field.FieldType == typeof(sbyte))
                 {
-                    currentField.DirectValues.Add(new("t", "sbyte", false));
+                    currentField.AddDirectValue("t", "sbyte");
 
-                    currentField.DirectValues.Add(new("v", ((sbyte)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((sbyte)fieldValue).ToString());
                     continue;
 
                 }
                 if (field.FieldType == typeof(short))
                 {
-                    currentField.DirectValues.Add(new("t", "short", false));
+                    currentField.AddDirectValue("t", "short");
 
-                    currentField.DirectValues.Add(new("v", ((short)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((short)fieldValue).ToString());
                     continue;
 
                 }
                 if (field.FieldType == typeof(ushort))
                 {
-                    currentField.DirectValues.Add(new("t", "ushort", false));
+                    currentField.AddDirectValue("t", "ushort");
 
-                    currentField.DirectValues.Add(new("v", ((ushort)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((ushort)fieldValue).ToString());
                     continue;
 
                 }
                 if (field.FieldType == typeof(int))
                 {
-                    currentField.DirectValues.Add(new("t", "int", false));
+                    currentField.AddDirectValue("t", "int");
 
-                    currentField.DirectValues.Add(new("v", ((int)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((int)fieldValue).ToString());
                     continue;
 
                 }
                 if (field.FieldType == typeof(uint))
                 {
-                    currentField.DirectValues.Add(new("t", "uint", false));
+                    currentField.AddDirectValue("t", "uint");
 
-                    currentField.DirectValues.Add(new("v", ((uint)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((uint)fieldValue).ToString());
                     continue;
                 }
                 if (field.FieldType == typeof(long))
                 {
-                    currentField.DirectValues.Add(new("t", "long", false));
+                    currentField.AddDirectValue("t", "long");
 
-                    currentField.DirectValues.Add(new("v", ((long)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((long)fieldValue).ToString());
                     continue;
 
                 }
                 if (field.FieldType == typeof(ulong))
                 {
-                    currentField.DirectValues.Add(new("t", "ulong", false));
+                    currentField.AddDirectValue("t", "ulong");
 
-                    currentField.DirectValues.Add(new("v", ((ulong)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((ulong)fieldValue).ToString());
                     continue;
 
                 }
                 if (field.FieldType == typeof(float))
                 {
-                    currentField.DirectValues.Add(new("t", "float", false));
+                    currentField.AddDirectValue("t", "float");
 
-                    currentField.DirectValues.Add(new("v", ((float)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((float)fieldValue).ToString());
                     continue;
 
                 }
                 if (field.FieldType == typeof(double))
                 {
-                    currentField.DirectValues.Add(new("t", "double", false));
+                    currentField.AddDirectValue("t", "double");
 
-                    currentField.DirectValues.Add(new("v", ((double)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((double)fieldValue).ToString());
                     continue;
 
                 }
                 if (field.FieldType == typeof(decimal))
                 {
-                    currentField.DirectValues.Add(new("t", "decimal", false));
+                    currentField.AddDirectValue("t", "decimal");
 
-                    currentField.DirectValues.Add(new("v", ((decimal)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((decimal)fieldValue).ToString());
                     continue;
 
                 }
                 //Char types
                 if (field.FieldType == typeof(char))
                 {
-                    currentField.DirectValues.Add(new("t", "char", false));
+                    currentField.AddDirectValue("t", "char");
 
-                    currentField.DirectValues.Add(new("v", ((char)field.GetValue(obj)).ToString(), false));
+                    currentField.AddDirectValue("v", ((char)fieldValue).ToString());
                     continue;
 
                 }
                 if (field.FieldType == typeof(string))
                 {
-                    currentField.DirectValues.Add(new("t", "string", false));
+                    currentField.AddDirectValue("t", "string");
 
-                    currentField.DirectValues.Add(new("v", (string)field.GetValue(obj), false));
+                    currentField.AddDirectValue("v", (string)fieldValue);
                     continue;
 
                 }
                 //Custom objects
-                currentField.DirectValues.Add(new("t", "p", false));
-                if (pointerObjectMap.TryGetValue(field.GetValue(obj), out int pointerValue)) // Has already parsed
-                {
-                    currentField.DirectValues.Add(new("v", pointerValue.ToString(), false));
-                    continue;
-                }
-                currentField.DirectValues.Add(new("v", pointerCount.ToString(), false));
+                currentField.AddDirectValue("t", "p");
 
-                result.AddRange(ConvertObject(field.GetValue(obj), pointerCount, pointerObjectMap));
-
+                currentField.AddDirectValue("v", conversion.GetReferencePointer(fieldValue));
             }
-            return result;
+            return;
         }
     }
 }
